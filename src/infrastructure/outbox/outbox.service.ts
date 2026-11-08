@@ -1,38 +1,37 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { createHmac, randomUUID } from 'node:crypto';
 import type { Model } from 'mongoose';
-import { OutboundEvent } from './outbox.schema.js';
+import { OutboundEvent } from './schemas/outbox.schema.js';
+
 @Injectable()
 export class OutboxService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(OutboxService.name);
+
   private timer?: ReturnType<typeof setInterval>;
+
   constructor(
     @InjectModel(OutboundEvent.name)
     private readonly events: Model<OutboundEvent>,
     private readonly config: ConfigService,
   ) {}
+
   onModuleInit(): void {
     if (process.env.VERCEL === '1') return;
     const delay = this.config.get<number>('OUTBOX_INTERVAL_MS', 30000);
     this.timer = setInterval(
       () =>
-        void this.dispatchDue().catch(() =>
-          this.logger.warn('Reintento de notificaciones falló'),
-        ),
+        void this.dispatchDue().catch(() => this.logger.warn('Reintento de notificaciones falló')),
       delay,
     );
     this.timer.unref();
   }
+
   onModuleDestroy(): void {
     if (this.timer) clearInterval(this.timer);
   }
+
   async enqueuePayment(order: {
     externalReference: string;
     companyId: number;
@@ -69,32 +68,27 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
     } catch (error: unknown) {
       if ((error as { code?: number }).code !== 11000) throw error;
     }
-    // Delivery runs independently from the charge request (timer or external dispatcher).
   }
+
   async dispatchDue(limit = 20): Promise<{ attempted: number }> {
-    if (!this.config.get<string>('AGROCLOUD_EVENT_URL'))
-      return { attempted: 0 };
+    if (!this.config.get<string>('AGROCLOUD_EVENT_URL')) return { attempted: 0 };
     const due = await this.events
       .find({
         status: 'PENDING',
         nextAttemptAt: { $lte: new Date() },
-        $or: [
-          { lockedUntil: { $exists: false } },
-          { lockedUntil: { $lte: new Date() } },
-        ],
+        $or: [{ lockedUntil: { $exists: false } }, { lockedUntil: { $lte: new Date() } }],
       })
       .sort({ createdAt: 1 })
       .limit(limit);
-    // Bound concurrency keeps one slow receiver from serializing the entire batch.
+
     for (let offset = 0; offset < due.length; offset += 4) {
       await Promise.all(
-        due
-          .slice(offset, offset + 4)
-          .map((event) => this.dispatchOne(event.eventKey)),
+        due.slice(offset, offset + 4).map((event) => this.dispatchOne(event.eventKey)),
       );
     }
     return { attempted: due.length };
   }
+
   private async dispatchOne(eventKey: string): Promise<void> {
     const url = this.config.get<string>('AGROCLOUD_EVENT_URL');
     if (!url) return;
@@ -104,20 +98,14 @@ export class OutboxService implements OnModuleInit, OnModuleDestroy {
         eventKey,
         status: 'PENDING',
         nextAttemptAt: { $lte: new Date() },
-        $or: [
-          { lockedUntil: { $exists: false } },
-          { lockedUntil: { $lte: new Date() } },
-        ],
+        $or: [{ lockedUntil: { $exists: false } }, { lockedUntil: { $lte: new Date() } }],
       },
       { $set: { lockToken, lockedUntil: new Date(Date.now() + 60000) } },
       { new: true },
     );
     if (!event) return;
     const body = JSON.stringify(event.payload);
-    const signature = createHmac(
-      'sha256',
-      this.config.getOrThrow<string>('AGROCLOUD_EVENT_SECRET'),
-    )
+    const signature = createHmac('sha256', this.config.getOrThrow<string>('AGROCLOUD_EVENT_SECRET'))
       .update(body)
       .digest('hex');
     try {

@@ -1,20 +1,14 @@
-import {
-  ConflictException,
-  Injectable,
-  UnprocessableEntityException,
-} from "@nestjs/common";
-import { InjectModel } from "@nestjs/mongoose";
-import type { Model } from "mongoose";
-import {
-  chargeMatchesOrder,
-  ChargeSnapshot,
-} from "../../common/utils/charge-verification.js";
-import { CulqiHttpError, CulqiService } from "../culqi/culqi.service.js";
-import { BillingOrder } from "../orders/order.schema.js";
-import { OrdersService } from "../orders/orders.service.js";
-import { OutboxService } from "../outbox/outbox.service.js";
-import { CreateChargeDto } from "./create-charge.dto.js";
-import { PaymentAttempt } from "./payment-attempt.schema.js";
+import { ConflictException, Injectable, UnprocessableEntityException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import type { Model } from 'mongoose';
+import { chargeMatchesOrder, ChargeSnapshot } from '../../common/utils/charge-verification.js';
+import { CulqiHttpError, CulqiService } from '../../integrations/culqi/culqi.service.js';
+import { BillingOrder } from '../orders/schemas/order.schema.js';
+import { OrdersService } from '../orders/orders.service.js';
+import { OutboxService } from '../../infrastructure/outbox/outbox.service.js';
+import { CreateChargeDto } from './dto/create-charge.dto.js';
+import { PaymentAttempt } from './schemas/payment-attempt.schema.js';
+
 @Injectable()
 export class PaymentsService {
   constructor(
@@ -26,28 +20,29 @@ export class PaymentsService {
     private readonly culqi: CulqiService,
     private readonly outbox: OutboxService,
   ) {}
+
   async charge(dto: CreateChargeDto): Promise<Record<string, unknown>> {
     const order = await this.orders.find(dto.externalReference);
     const claimed = await this.ordersModel.findOneAndUpdate(
-      { externalReference: dto.externalReference, status: "PENDING" },
-      { $set: { status: "PROCESSING" } },
+      { externalReference: dto.externalReference, status: 'PENDING' },
+      { $set: { status: 'PROCESSING' } },
       { new: true },
     );
     if (!claimed)
       throw new ConflictException(
         `No se puede cobrar una orden con estado ${order.status}; consulta el pago o reconcilia antes de reintentar`,
       );
-    // If persistence fails before contacting Culqi, release only our untouched claim.
+
     const attempt = await this.attempts
-      .create({ orderReference: order.externalReference, status: "PROCESSING" })
+      .create({ orderReference: order.externalReference, status: 'PROCESSING' })
       .catch(async (error: unknown) => {
         await this.ordersModel.updateOne(
           {
             externalReference: order.externalReference,
-            status: "PROCESSING",
+            status: 'PROCESSING',
             culqiChargeId: { $exists: false },
           },
-          { $set: { status: "PENDING" } },
+          { $set: { status: 'PENDING' } },
         );
         throw error;
       });
@@ -61,72 +56,61 @@ export class PaymentsService {
         reference: order.externalReference,
       });
       chargeCreated = true;
-      if (!result.id)
-        throw new Error("Culqi no devolvió identificador de cargo");
+      if (!result.id) throw new Error('Culqi no devolvió identificador de cargo');
       await this.ordersModel.updateOne(
         { externalReference: order.externalReference },
         { $set: { culqiChargeId: result.id } },
       );
-      await this.attempts.updateOne(
-        { _id: attempt._id },
-        { $set: { culqiChargeId: result.id } },
-      );
-      // Solo una consulta verificada de Culqi activa el pago.
+      await this.attempts.updateOne({ _id: attempt._id }, { $set: { culqiChargeId: result.id } });
+
       const verified = await this.culqi.getCharge(result.id);
       if (!chargeMatchesOrder(verified, order))
-        throw new Error("El cargo requiere revisión o autenticación adicional");
+        throw new Error('El cargo requiere revisión o autenticación adicional');
       await this.finalizeVerifiedCharge(order.externalReference, verified);
-      await this.attempts.updateOne(
-        { _id: attempt._id },
-        { $set: { status: "SUCCEEDED" } },
-      );
+      await this.attempts.updateOne({ _id: attempt._id }, { $set: { status: 'SUCCEEDED' } });
       return {
-        status: "PAID",
+        status: 'PAID',
         orderReference: order.externalReference,
         chargeId: verified.id,
       };
     } catch (error: unknown) {
-      // HTTP 400/402/422 son rechazos inequívocos; TIMEOUT/5xx pueden haber cobrado.
-      const declined =
-        !chargeCreated && error instanceof CulqiHttpError && error.definitive;
-      // Si el pago se confirmó pero falló una entrega posterior, nunca revertimos a PENDING.
+      const declined = !chargeCreated && error instanceof CulqiHttpError && error.definitive;
+
       const current = await this.ordersModel.findOne({
         externalReference: order.externalReference,
       });
-      if (current?.status === "PAID") {
-        await this.attempts.updateOne(
-          { _id: attempt._id },
-          { $set: { status: "SUCCEEDED" } },
-        );
+      if (current?.status === 'PAID') {
+        await this.attempts.updateOne({ _id: attempt._id }, { $set: { status: 'SUCCEEDED' } });
         return {
-          status: "PAID",
+          status: 'PAID',
           orderReference: order.externalReference,
           chargeId: current.culqiChargeId,
-          notification: "PENDING_RETRY",
+          notification: 'PENDING_RETRY',
         };
       }
       await this.ordersModel.updateOne(
-        { externalReference: order.externalReference, status: "PROCESSING" },
-        { $set: { status: declined ? "PENDING" : "UNKNOWN" } },
+        { externalReference: order.externalReference, status: 'PROCESSING' },
+        { $set: { status: declined ? 'PENDING' : 'UNKNOWN' } },
       );
       await this.attempts.updateOne(
         { _id: attempt._id },
         {
           $set: {
-            status: declined ? "DECLINED" : "UNKNOWN",
-            errorCode: declined ? `HTTP_${error.status}` : "RECONCILE_REQUIRED",
+            status: declined ? 'DECLINED' : 'UNKNOWN',
+            errorCode: declined ? `HTTP_${error.status}` : 'RECONCILE_REQUIRED',
           },
         },
       );
       if (declined)
         throw new UnprocessableEntityException(
-          "Culqi rechazó el cargo. Puedes utilizar otro token para reintentar.",
+          'Culqi rechazó el cargo. Puedes utilizar otro token para reintentar.',
         );
       throw new ConflictException(
-        "Resultado indeterminado: no repitas el cobro; primero reconcilia el estado con Culqi.",
+        'Resultado indeterminado: no repitas el cobro; primero reconcilia el estado con Culqi.',
       );
     }
   }
+
   async finalizeVerifiedCharge(
     reference: string,
     verified: ChargeSnapshot,
@@ -134,13 +118,13 @@ export class PaymentsService {
     const order = await this.orders.find(reference);
     if (!chargeMatchesOrder(verified, order))
       throw new ConflictException(
-        "El cargo no coincide con el importe, moneda o referencia de la orden",
+        'El cargo no coincide con el importe, moneda o referencia de la orden',
       );
     const updated = await this.ordersModel.findOneAndUpdate(
-      { externalReference: reference, status: { $nin: ["PAID", "REFUNDED"] } },
+      { externalReference: reference, status: { $nin: ['PAID', 'REFUNDED'] } },
       {
         $set: {
-          status: "PAID",
+          status: 'PAID',
           paidAt: new Date(),
           culqiChargeId: verified.id,
         },
@@ -148,32 +132,33 @@ export class PaymentsService {
       { new: true },
     );
     const paid = updated ?? (await this.orders.find(reference));
-    if (paid.status !== "PAID")
-      throw new ConflictException("La orden no admite esta confirmación");
-    // Evento idempotente; permanece en MongoDB si Laravel no está disponible.
+    if (paid.status !== 'PAID') throw new ConflictException('La orden no admite esta confirmación');
+
     await this.outbox.enqueuePayment(paid);
-    return { status: "PAID" };
+    return { status: 'PAID' };
   }
+
   async reconcile(reference: string): Promise<Record<string, unknown>> {
     const order = await this.orders.find(reference);
-    if (order.status === "PAID") {
+    if (order.status === 'PAID') {
       await this.outbox.enqueuePayment(order);
       return { status: order.status, orderReference: reference };
     }
     if (!order.culqiChargeId)
       return {
-        status: "UNKNOWN",
+        status: 'UNKNOWN',
         detail:
-          "No existe ID de cargo; revisar operación en Culqi Panel antes de permitir otro intento",
+          'No existe ID de cargo; revisar operación en Culqi Panel antes de permitir otro intento',
       };
     const verified = await this.culqi.getCharge(order.culqiChargeId);
     if (chargeMatchesOrder(verified, order))
       return await this.finalizeVerifiedCharge(reference, verified);
     return {
-      status: "UNKNOWN",
-      detail: "El proveedor no confirma una venta exitosa",
+      status: 'UNKNOWN',
+      detail: 'El proveedor no confirma una venta exitosa',
     };
   }
+
   async status(reference: string): Promise<Record<string, unknown>> {
     const order = await this.orders.find(reference);
     const latest = await this.attempts

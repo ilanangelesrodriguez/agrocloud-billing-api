@@ -2,28 +2,28 @@ import {
   ApiContract,
   refundSchema,
   referenceParameter,
-} from "../../common/docs/api-contract.js";
+} from '../../common/decorators/api-contract.decorator.js';
 
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 
-import { ApiSecurity, ApiTags } from "@nestjs/swagger";
+import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 
-import { ServiceKeyGuard } from "../../common/auth/service-key.guard.js";
+import { ServiceKeyGuard } from '../../common/auth/service-key.guard.js';
 
-import { RefundDto } from "./refund.dto.js";
+import { RefundDto } from './dto/refund.dto.js';
 
-import { RefundsService } from "./refunds.service.js";
+import { RefundsService } from './refunds.service.js';
 
-@ApiTags("Reembolsos")
-@ApiSecurity("service-key")
+@ApiTags('Reembolsos')
+@ApiSecurity('service-key')
 @UseGuards(ServiceKeyGuard)
-@Controller("refunds")
+@Controller('refunds')
 export class RefundsController {
   constructor(private readonly service: RefundsService) {}
 
   @ApiContract(
-    "Solicitar un reembolso total",
-    "Solo pagos PAID. Una solicitud por orden. PENDING_VERIFICATION no acredita una devolución completada.",
+    'Solicitar un reembolso total',
+    'Solo pagos PAID. Una solicitud por orden. PENDING_VERIFICATION no acredita una devolución completada.',
     refundSchema,
     201,
   )
@@ -33,13 +33,9 @@ export class RefundsController {
   }
 
   @referenceParameter()
-  @ApiContract(
-    "Consultar un reembolso",
-    "Consulta el estado local de la solicitud.",
-    refundSchema,
-  )
-  @Get(":reference")
-  find(@Param("reference") reference: string) {
+  @ApiContract('Consultar un reembolso', 'Consulta el estado local de la solicitud.', refundSchema)
+  @Get(':reference')
+  find(@Param('reference') reference: string) {
     return this.service.find(reference);
   }
 }

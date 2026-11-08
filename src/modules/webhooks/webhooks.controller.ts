@@ -1,41 +1,36 @@
-import { ApiContract } from "../../common/docs/api-contract.js";
+import { ApiContract } from '../../common/decorators/api-contract.decorator.js';
 
-import { Body, Controller, Param, Post } from "@nestjs/common";
+import { Body, Controller, Param, Post } from '@nestjs/common';
 
-import { ApiBody, ApiParam, ApiTags } from "@nestjs/swagger";
+import { ApiBody, ApiParam, ApiTags } from '@nestjs/swagger';
 
-import { WebhooksService } from "./webhooks.service.js";
+import { WebhooksService } from './webhooks.service.js';
 
-@ApiTags("Culqi Webhooks")
-@Controller("webhooks/culqi")
+@ApiTags('Culqi Webhooks')
+@Controller('webhooks/culqi')
 export class WebhooksController {
   constructor(private readonly webhooks: WebhooksService) {}
 
-  // URL registrada en Culqi Panel: /api/v1/webhooks/culqi/<token aleatorio>
-
-  // No se confía en el contenido del evento: SIEMPRE se consulta el cargo real al proveedor.
-
   @ApiParam({
-    name: "token",
-    description:
-      "Token privado registrado en Culqi Panel. No registrar en logs.",
-    schema: { type: "string", minLength: 32 },
+    name: 'token',
+    description: 'Token privado registrado en Culqi Panel. No registrar en logs.',
+    schema: { type: 'string', minLength: 32 },
   })
   @ApiBody({
     schema: {
-      type: "object",
-      required: ["id", "type", "data"],
+      type: 'object',
+      required: ['id', 'type', 'data'],
       properties: {
-        id: { type: "string", example: "evt_test_example" },
+        id: { type: 'string', example: 'evt_test_example' },
 
-        type: { type: "string", example: "charge.creation.succeeded" },
+        type: { type: 'string', example: 'charge.creation.succeeded' },
 
         data: {
           oneOf: [
-            { type: "object", additionalProperties: true },
+            { type: 'object', additionalProperties: true },
             {
-              type: "string",
-              description: "Objeto del proveedor serializado como JSON.",
+              type: 'string',
+              description: 'Objeto del proveedor serializado como JSON.',
             },
           ],
         },
@@ -43,24 +38,24 @@ export class WebhooksController {
     },
   })
   @ApiContract(
-    "Recibir una notificación Culqi",
-    "Deduplica por id y verifica el cargo consultando Culqi. accepted no significa pago confirmado. review requiere conciliación.",
+    'Recibir una notificación Culqi',
+    'Deduplica por id y verifica el cargo consultando Culqi. accepted no significa pago confirmado. review requiere conciliación.',
     {
-      type: "object",
+      type: 'object',
       properties: {
-        accepted: { type: "boolean" },
-        duplicate: { type: "boolean" },
-        ignored: { type: "boolean" },
+        accepted: { type: 'boolean' },
+        duplicate: { type: 'boolean' },
+        ignored: { type: 'boolean' },
 
-        processed: { type: "boolean" },
-        review: { type: "boolean" },
-        reason: { type: "string" },
+        processed: { type: 'boolean' },
+        review: { type: 'boolean' },
+        reason: { type: 'string' },
       },
     },
     201,
   )
-  @Post(":token")
-  receive(@Param("token") token: string, @Body() body: unknown) {
+  @Post(':token')
+  receive(@Param('token') token: string, @Body() body: unknown) {
     return this.webhooks.process(token, body);
   }
 }

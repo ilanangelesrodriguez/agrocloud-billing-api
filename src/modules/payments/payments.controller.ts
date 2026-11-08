@@ -2,56 +2,56 @@ import {
   ApiContract,
   paymentSchema,
   referenceParameter,
-} from "../../common/docs/api-contract.js";
+} from '../../common/decorators/api-contract.decorator.js';
 
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 
-import { ApiSecurity, ApiTags } from "@nestjs/swagger";
+import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 
-import { ServiceKeyGuard } from "../../common/auth/service-key.guard.js";
+import { ServiceKeyGuard } from '../../common/auth/service-key.guard.js';
 
-import { CreateChargeDto } from "./create-charge.dto.js";
+import { CreateChargeDto } from './dto/create-charge.dto.js';
 
-import { PaymentsService } from "./payments.service.js";
+import { PaymentsService } from './payments.service.js';
 
-@ApiTags("Pagos")
-@ApiSecurity("service-key")
+@ApiTags('Pagos')
+@ApiSecurity('service-key')
 @UseGuards(ServiceKeyGuard)
-@Controller("payments")
+@Controller('payments')
 export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}
 
   @ApiContract(
-    "Cobrar con token Culqi",
-    "El importe procede de la orden. Solo PENDING admite cobros. UNKNOWN requiere conciliación antes de reintentar.",
+    'Cobrar con token Culqi',
+    'El importe procede de la orden. Solo PENDING admite cobros. UNKNOWN requiere conciliación antes de reintentar.',
     paymentSchema,
     201,
   )
-  @Post("charges")
+  @Post('charges')
   charge(@Body() dto: CreateChargeDto) {
     return this.payments.charge(dto);
   }
 
   @referenceParameter()
   @ApiContract(
-    "Consultar un pago",
-    "Estado local e intento más reciente; no genera un nuevo cargo.",
+    'Consultar un pago',
+    'Estado local e intento más reciente; no genera un nuevo cargo.',
     paymentSchema,
   )
-  @Get(":reference")
-  status(@Param("reference") reference: string) {
+  @Get(':reference')
+  status(@Param('reference') reference: string) {
     return this.payments.status(reference);
   }
 
   @referenceParameter()
   @ApiContract(
-    "Conciliar un pago",
-    "Consulta el cargo existente en Culqi. Si falta su identificador, requiere revisión manual en Culqi Panel.",
+    'Conciliar un pago',
+    'Consulta el cargo existente en Culqi. Si falta su identificador, requiere revisión manual en Culqi Panel.',
     paymentSchema,
     201,
   )
-  @Post(":reference/reconcile")
-  reconcile(@Param("reference") reference: string) {
+  @Post(':reference/reconcile')
+  reconcile(@Param('reference') reference: string) {
     return this.payments.reconcile(reference);
   }
 }

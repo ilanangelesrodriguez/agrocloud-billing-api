@@ -1,59 +1,50 @@
-import type { NestExpressApplication } from "@nestjs/platform-express";
-import { ConfigService } from "@nestjs/config";
-import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
-import type { Express, Response } from "express";
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import { ConfigService } from '@nestjs/config';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { Express, Response } from 'express';
 
-export function configureSwagger(
-  app: NestExpressApplication,
-): void {
+export function configureSwagger(app: NestExpressApplication): void {
   const config = app.get(ConfigService);
 
-  if (!config.get<boolean>("SWAGGER_ENABLED", true)) {
+  if (!config.get<boolean>('SWAGGER_ENABLED', true)) {
     return;
   }
 
   const definition = new DocumentBuilder()
-    .setTitle("AgroCloud · Billing API")
-    .setDescription(
-      "API de pagos, órdenes, reembolsos y eventos con Culqi para AgroCloud.",
-    )
-    .setVersion("0.1.0")
+    .setTitle('AgroCloud · Billing API')
+    .setDescription('API de pagos, órdenes, reembolsos y eventos con Culqi para AgroCloud.')
+    .setVersion('0.1.0')
     .addApiKey(
       {
-        type: "apiKey",
-        in: "header",
-        name: "x-service-key",
-        description: "Clave privada del backend AgroCloud",
+        type: 'apiKey',
+        in: 'header',
+        name: 'x-service-key',
+        description: 'Clave privada del backend AgroCloud',
       },
-      "service-key",
+      'service-key',
     )
-    .addTag("Órdenes", "Órdenes de cobro")
-    .addTag("Pagos", "Cargos y conciliación con Culqi")
-    .addTag("Reembolsos", "Solicitudes de devolución")
-    .addTag("Culqi Webhooks", "Eventos de Culqi")
-    .addTag("Eventos internos", "Eventos hacia Laravel")
-    .addTag("Health", "Estado del servicio")
+    .addTag('Órdenes', 'Órdenes de cobro')
+    .addTag('Pagos', 'Cargos y conciliación con Culqi')
+    .addTag('Reembolsos', 'Solicitudes de devolución')
+    .addTag('Culqi Webhooks', 'Eventos de Culqi')
+    .addTag('Eventos internos', 'Eventos hacia Laravel')
+    .addTag('Health', 'Estado del servicio')
     .build();
 
-  const document = SwaggerModule.createDocument(
-    app,
-    definition,
-  );
+  const document = SwaggerModule.createDocument(app, definition);
 
-  // NestJS sirve el OpenAPI JSON, pero no sus archivos UI.
-  SwaggerModule.setup("docs", app, document, {
+  SwaggerModule.setup('docs', app, document, {
     ui: false,
-    raw: ["json"],
-    jsonDocumentUrl: "/docs-json",
+    raw: ['json'],
+    jsonDocumentUrl: '/docs-json',
   });
 
-  // Swagger UI pública con recursos desde CDN.
   const express = app.getHttpAdapter().getInstance() as Express;
 
-  express.get("/docs", (_req, res: Response) => {
-    res.setHeader("Cache-Control", "no-store");
+  express.get('/docs', (_req, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
 
-    res.type("html").send(`
+    res.type('html').send(`
 <!DOCTYPE html>
 <html lang="es">
 <head>

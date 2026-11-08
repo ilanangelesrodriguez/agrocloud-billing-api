@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { equalSecret } from '../src/common/auth/service-key.guard.js';
+import { equalSecret } from '../src/common/utils/secret.js';
+
 describe('Secretos de servicio', () => {
   it('acepta solo valores idénticos', () => {
     expect(equalSecret('A'.repeat(32), 'A'.repeat(32))).toBe(true);
