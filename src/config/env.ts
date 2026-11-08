@@ -5,18 +5,6 @@ export const envSchema = Joi.object({
     .default("development"),
   PORT: Joi.number().port().default(3000),
   SWAGGER_ENABLED: Joi.boolean().default(true),
-  SWAGGER_USERNAME: Joi.string()
-    .pattern(/^[A-Za-z0-9_-]+$/)
-    .default("docs"),
-  SWAGGER_PASSWORD: Joi.when("NODE_ENV", {
-    is: "production",
-    then: Joi.when("SWAGGER_ENABLED", {
-      is: true,
-      then: Joi.string().min(32).required(),
-      otherwise: Joi.string().min(32).optional(),
-    }),
-    otherwise: Joi.string().min(32).optional(),
-  }),
   MONGODB_URI: Joi.string()
     .pattern(/^mongodb(\+srv)?:\/\//)
     .required(),
