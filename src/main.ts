@@ -61,7 +61,7 @@ async function createApplication(): Promise<Express> {
     );
   }
 
-  return app.getHttpAdapter().getInstance<Express>();
+  return app.getHttpAdapter().getInstance() as Express;
 }
 
 // Punto de entrada HTTP para Vercel.
