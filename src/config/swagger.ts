@@ -89,7 +89,13 @@ export function configureSwagger(
         filter: true,
         displayRequestDuration: true,
         docExpansion: "none",
-        supportedSubmitMethods: []
+        supportedSubmitMethods: [
+          "get",
+          "post",
+          "put",
+          "patch",
+          "delete",
+        ],
       });
     };
   </script>
