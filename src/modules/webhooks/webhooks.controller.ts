@@ -1,6 +1,6 @@
 import { ApiContract } from '../../common/decorators/api-contract.decorator.js';
 
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, Param, Post } from '@nestjs/common';
 
 import { ApiBody, ApiParam, ApiTags } from '@nestjs/swagger';
 
@@ -52,8 +52,9 @@ export class WebhooksController {
         reason: { type: 'string' },
       },
     },
-    201,
+    200,
   )
+  @HttpCode(200)
   @Post(':token')
   receive(@Param('token') token: string, @Body() body: unknown) {
     return this.webhooks.process(token, body);

@@ -4,6 +4,12 @@
 
 AgroCloud es la autoridad de planes, versiones, usuarios, suscripciones, complementos y cupos. Billing API tiene **MongoDB** y es la autoridad de órdenes, intentos y resultados de pago. Nunca conectar NestJS directamente a las tablas operativas de PostgreSQL.
 
+### Respuestas HTTP de Billing API
+
+Las operaciones devuelven `{ success, statusCode, data, meta }`. Lee el estado comercial desde `data.status`. Los errores devuelven `{ success: false, statusCode, error: { code, message, details? }, meta }`; `meta.requestId` también está disponible en `X-Request-Id`. Los estados `PROCESSING` y `UNKNOWN` requieren consulta o conciliación antes de un nuevo cargo.
+
+Esta envoltura aplica a las respuestas HTTP de la API. El cuerpo de los eventos salientes firmados con HMAC no cambia; Laravel sigue validando la firma sobre los bytes exactos recibidos y deduplicando por `event_id`.
+
 ### Alta de plan pagado
 
 1. Laravel valida RUC/correo, plan y versión comercial y registra una contratación **pendiente**.

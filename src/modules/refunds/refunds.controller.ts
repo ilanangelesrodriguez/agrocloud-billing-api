@@ -4,7 +4,7 @@ import {
   referenceParameter,
 } from '../../common/decorators/api-contract.decorator.js';
 
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, Get, Param, Post, UseGuards } from '@nestjs/common';
 
 import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 
@@ -25,8 +25,9 @@ export class RefundsController {
     'Solicitar un reembolso total',
     'Solo pagos PAID. Una solicitud por orden. PENDING_VERIFICATION no acredita una devolución completada.',
     refundSchema,
-    201,
+    202,
   )
+  @HttpCode(202)
   @Post()
   request(@Body() dto: RefundDto) {
     return this.service.request(dto);

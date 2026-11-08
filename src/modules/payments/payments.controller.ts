@@ -4,7 +4,7 @@ import {
   referenceParameter,
 } from '../../common/decorators/api-contract.decorator.js';
 
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, Get, Param, Post, UseGuards } from '@nestjs/common';
 
 import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 
@@ -48,8 +48,9 @@ export class PaymentsController {
     'Conciliar un pago',
     'Consulta el cargo existente en Culqi. Si falta su identificador, requiere revisión manual en Culqi Panel.',
     paymentSchema,
-    201,
+    200,
   )
+  @HttpCode(200)
   @Post(':reference/reconcile')
   reconcile(@Param('reference') reference: string) {
     return this.payments.reconcile(reference);

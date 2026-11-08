@@ -1,4 +1,5 @@
 import { applyDecorators } from '@nestjs/common';
+import { failureSchema, successSchema } from '../http/api-response.schemas.js';
 
 import { ApiOperation, ApiResponse, ApiParam, type SchemaObject } from '@nestjs/swagger';
 
@@ -104,7 +105,7 @@ export function ApiContract(
   status = 200,
   secured = true,
 ) {
-  const errors = secured ? [400, 401, 404, 409, 422, 503] : [400, 503];
+  const errors = secured ? [400, 401, 404, 409, 422, 500, 503] : [400, 500, 503];
 
   return applyDecorators(
     ApiOperation({ summary, description }),
@@ -112,7 +113,13 @@ export function ApiContract(
     ApiResponse({
       status,
       description: 'Operación completada. Consulta el estado de negocio en el cuerpo.',
-      schema,
+      schema: successSchema(schema, status),
+      headers: {
+        'X-Request-Id': {
+          description: 'Identificador de la solicitud.',
+          schema: { type: 'string', format: 'uuid' },
+        },
+      },
     }),
 
     ...errors.map((code) =>
@@ -125,17 +132,15 @@ export function ApiContract(
             404: 'Recurso no encontrado.',
             409: 'Conflicto de estado o resultado indeterminado; no repetir el cargo.',
             422: 'Cargo rechazado por el proveedor.',
+            500: 'Error interno del servidor.',
             503: 'Dependencia no disponible.',
           } as Record<number, string>
         )[code],
-        schema: {
-          type: 'object',
-          properties: {
-            statusCode: { type: 'integer', example: code },
-            message: {
-              oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
-            },
-            error: { type: 'string' },
+        schema: failureSchema(code),
+        headers: {
+          'X-Request-Id': {
+            description: 'Identificador para soporte y seguimiento.',
+            schema: { type: 'string', format: 'uuid' },
           },
         },
       }),

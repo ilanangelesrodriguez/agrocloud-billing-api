@@ -12,7 +12,20 @@ export function configureSwagger(app: NestExpressApplication): void {
 
   const definition = new DocumentBuilder()
     .setTitle('AgroCloud · Billing API')
-    .setDescription('API de pagos, órdenes, reembolsos y eventos con Culqi para AgroCloud.')
+    .setDescription(
+      [
+        'API privada de pagos, órdenes, reembolsos y eventos con Culqi para AgroCloud.',
+        '## Integración',
+        'Crea una orden, tokeniza con Culqi Checkout y solicita el cargo desde el backend con `x-service-key`.',
+        'Ante `UNKNOWN`, concilia antes de reintentar. Un HTTP 2xx indica que la petición fue procesada; revisa siempre el estado de negocio dentro de `data`.',
+        '## Respuestas',
+        'Éxito: `{ success: true, statusCode, data, meta }`. Error: `{ success: false, statusCode, error: { code, message, details? }, meta }`.',
+        '`meta` incluye `requestId` y `timestamp` UTC. El identificador también se devuelve en `X-Request-Id`.',
+        'Los errores de validación usan `VALIDATION_ERROR` con detalles de los campos. Los errores internos no exponen información del servidor.',
+        '## Rutas',
+        '`/` presenta el servicio; `/health` verifica el proceso; `/ready` verifica MongoDB. Las operaciones comerciales usan `/api/v1`.',
+      ].join('\n\n'),
+    )
     .setVersion('0.1.0')
     .addApiKey(
       {
@@ -28,18 +41,25 @@ export function configureSwagger(app: NestExpressApplication): void {
     .addTag('Reembolsos', 'Solicitudes de devolución')
     .addTag('Culqi Webhooks', 'Eventos de Culqi')
     .addTag('Eventos internos', 'Eventos hacia Laravel')
-    .addTag('Health', 'Estado del servicio')
+    .addTag('Servicio', 'Descubrimiento, disponibilidad del proceso y de MongoDB')
     .build();
 
-  const document = SwaggerModule.createDocument(app, definition);
+  const document = SwaggerModule.createDocument(app, definition, {
+    operationIdFactory: (controller, method) => `${controller.replace('Controller', '')}_${method}`,
+  });
 
   SwaggerModule.setup('docs', app, document, {
     ui: false,
     raw: ['json'],
-    jsonDocumentUrl: '/docs-json',
+    jsonDocumentUrl: '/openapi.json',
   });
 
   const express = app.getHttpAdapter().getInstance() as Express;
+
+  express.get('/docs-json', (_req, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(document);
+  });
 
   express.get('/docs', (_req, res: Response) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -69,9 +89,11 @@ export function configureSwagger(app: NestExpressApplication): void {
   <script>
     window.onload = function () {
       window.ui = SwaggerUIBundle({
-        url: "/docs-json",
+        url: "/openapi.json",
         dom_id: "#swagger-ui",
         deepLinking: true,
+        persistAuthorization: false,
+        validatorUrl: null,
         presets: [
           SwaggerUIBundle.presets.apis,
           SwaggerUIStandalonePreset

@@ -1,5 +1,5 @@
 import { ApiContract } from '../../common/decorators/api-contract.decorator.js';
-import { Controller, Post, UseGuards } from '@nestjs/common';
+import { Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
 import { ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { ServiceKeyGuard } from '../../common/auth/service-key.guard.js';
 import { OutboxService } from './outbox.service.js';
@@ -18,8 +18,9 @@ export class OutboxController {
       type: 'object',
       properties: { attempted: { type: 'integer', example: 4 } },
     },
-    201,
+    200,
   )
+  @HttpCode(200)
   @Post('dispatch')
   dispatch() {
     return this.outbox.dispatchDue();

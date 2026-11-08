@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
-import { HealthController } from './health.controller.js';
+import { LegacyHealthController } from './legacy-health.controller.js';
+import { ServiceController } from './service.controller.js';
+import { HealthService } from './health.service.js';
 
-@Module({ controllers: [HealthController] })
+@Module({ controllers: [LegacyHealthController, ServiceController], providers: [HealthService] })
 export class HealthModule {}

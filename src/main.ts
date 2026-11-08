@@ -5,11 +5,13 @@ import type { Request, Response, Express } from 'express';
 import { AppModule } from './app.module.js';
 import { configureApplication } from './bootstrap/application.js';
 import { ConfigService } from '@nestjs/config';
+import { errorResponse } from './common/http/api-response.js';
 
 let serverPromise: Promise<Express> | undefined;
 
 async function createApplication(): Promise<Express> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    abortOnError: false,
     rawBody: true,
     bodyParser: true,
   });
@@ -39,10 +41,17 @@ export default async function handler(req: Request, res: Response): Promise<void
     console.error('Error al iniciar AgroCloud Billing API:', error);
 
     if (!res.headersSent) {
-      res.status(500).json({
-        statusCode: 500,
-        message: 'Error interno del servidor',
-      });
+      res.setHeader('Cache-Control', 'no-store');
+      res
+        .status(503)
+        .json(
+          errorResponse(
+            res,
+            503,
+            'SERVICE_UNAVAILABLE',
+            'El servicio no está disponible temporalmente.',
+          ),
+        );
     }
   }
 }

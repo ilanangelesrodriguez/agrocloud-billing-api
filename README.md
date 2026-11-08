@@ -18,11 +18,12 @@ npm run start:dev
 ```
 
 - Documentación Swagger: [localhost:3000/docs](http://localhost:3000/docs).
-- Contrato OpenAPI: [localhost:3000/docs-json](http://localhost:3000/docs-json).
-- Estado del proceso: `GET /api/v1/health`.
-- Disponibilidad de MongoDB: `GET /api/v1/health/ready`.
+- Contrato OpenAPI: [localhost:3000/openapi.json](http://localhost:3000/openapi.json).
+- Entrada del servicio: `GET /` o `GET /api/v1`.
+- Estado del proceso: `GET /health`.
+- Disponibilidad de MongoDB: `GET /ready`.
 
-`SWAGGER_ENABLED=false` deshabilita la documentación. Actualmente `/docs` y `/docs-json` son públicos; las operaciones privadas de la API requieren `x-service-key`.
+`SWAGGER_ENABLED=false` deshabilita la documentación. Actualmente `/docs` y `/openapi.json` son públicos; las operaciones privadas de la API requieren `x-service-key`.
 
 ## Cómo usar la API
 
@@ -51,10 +52,32 @@ Desde el backend Laravel, envía `x-service-key` con el valor de `SERVICE_API_KE
    }
    ```
 
-3. Consulta `GET /api/v1/payments/AGRO-ORDER-000125`. Si el resultado es `UNKNOWN`, concilia con `POST /api/v1/payments/AGRO-ORDER-000125/reconcile` antes de repetir el cobro.
+3. Consulta `GET /api/v1/payments/AGRO-ORDER-000125`. Si `data.status` es `UNKNOWN`, concilia con `POST /api/v1/payments/AGRO-ORDER-000125/reconcile` antes de repetir el cobro.
 4. Configura `AGROCLOUD_EVENT_URL` y `AGROCLOUD_EVENT_SECRET` para que Laravel reciba y valide el evento HMAC `payment.succeeded` y active el servicio una sola vez.
 
 Los importes se expresan en céntimos de PEN. Mantén `SERVICE_API_KEY` y las claves secretas de Culqi exclusivamente en el backend. Los reembolsos quedan pendientes de verificación; no cancelan automáticamente suscripciones.
+
+## Respuestas
+
+Las respuestas JSON de los controladores usan este contrato:
+
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "data": { "status": "PAID", "orderReference": "AGRO-ORDER-000125" },
+  "meta": {
+    "requestId": "9b3f4900-d861-4a74-8db9-e174cd284f1d",
+    "timestamp": "2026-11-08T12:00:00.000Z"
+  }
+}
+```
+
+Los errores usan `success: false` y `error: { code, message, details? }` en lugar de `data`, conservando `statusCode` y `meta`. `VALIDATION_ERROR` incluye los campos inválidos en `details`; una ruta inexistente devuelve JSON con HTTP 404 y código `NOT_FOUND`. El identificador también está en `X-Request-Id`.
+
+Los clientes deben leer los resultados desde `data` (por ejemplo, `data.status`). Este cambio sustituye las respuestas planas anteriores. HTTP 2xx confirma el procesamiento de la solicitud, no necesariamente un pago o reembolso completado. La conciliación, los webhooks y el despacho devuelven 200; crear órdenes o cargos devuelve 201; solicitar un reembolso devuelve 202 mientras espera verificación.
+
+Se conservan `/docs-json`, `/api/v1/health` y `/api/v1/health/ready` como alias. El documento OpenAPI mantiene su formato estándar, sin envoltorio. Los eventos HMAC enviados a Laravel conservan su payload y firma actuales.
 
 ## Estructura
 
