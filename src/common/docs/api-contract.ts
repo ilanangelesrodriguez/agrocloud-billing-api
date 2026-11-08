@@ -1,8 +1,11 @@
 import { applyDecorators } from "@nestjs/common";
 
-import { ApiOperation, ApiResponse, ApiParam } from "@nestjs/swagger";
-
-import type { SchemaObject } from "@nestjs/swagger/dist/interfaces/open-api-spec.interface.js";
+import {
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  type SchemaObject,
+} from "@nestjs/swagger";
 
 export const referenceParameter = () =>
   ApiParam({
