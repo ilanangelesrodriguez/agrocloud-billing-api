@@ -79,21 +79,6 @@ Los clientes deben leer los resultados desde `data` (por ejemplo, `data.status`)
 
 Se conservan `/docs-json`, `/api/v1/health` y `/api/v1/health/ready` como alias. El documento OpenAPI mantiene su formato estándar, sin envoltorio. Los eventos HMAC enviados a Laravel conservan su payload y firma actuales.
 
-## Estructura
-
-```text
-src/
-  bootstrap/        Configuración HTTP y Swagger
-  common/           Autenticación, decoradores y utilidades compartidas
-  config/           Validación de variables de entorno
-  infrastructure/   Conexión a MongoDB y entrega de eventos outbox
-  integrations/     Cliente de Culqi
-  modules/          Órdenes, pagos, reembolsos, webhooks y salud
-  app.module.ts     Composición de módulos
-  main.ts           Entrada local y serverless
-```
-
-Los módulos mantienen controladores, servicios y módulos de NestJS juntos; los contratos de entrada viven en `dto/` y los modelos de MongoDB en `schemas/`. El formato utiliza dos espacios y comillas simples, configurados en `.editorconfig` y `.prettierrc.json`. Ejecuta `npm run format` para aplicarlo al código.
 
 ## Producción
 

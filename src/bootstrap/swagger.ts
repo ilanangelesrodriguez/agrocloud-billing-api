@@ -15,15 +15,6 @@ export function configureSwagger(app: NestExpressApplication): void {
     .setDescription(
       [
         'API privada de pagos, órdenes, reembolsos y eventos con Culqi para AgroCloud.',
-        '## Integración',
-        'Crea una orden, tokeniza con Culqi Checkout y solicita el cargo desde el backend con `x-service-key`.',
-        'Ante `UNKNOWN`, concilia antes de reintentar. Un HTTP 2xx indica que la petición fue procesada; revisa siempre el estado de negocio dentro de `data`.',
-        '## Respuestas',
-        'Éxito: `{ success: true, statusCode, data, meta }`. Error: `{ success: false, statusCode, error: { code, message, details? }, meta }`.',
-        '`meta` incluye `requestId` y `timestamp` UTC. El identificador también se devuelve en `X-Request-Id`.',
-        'Los errores de validación usan `VALIDATION_ERROR` con detalles de los campos. Los errores internos no exponen información del servidor.',
-        '## Rutas',
-        '`/` presenta el servicio; `/health` verifica el proceso; `/ready` verifica MongoDB. Las operaciones comerciales usan `/api/v1`.',
       ].join('\n\n'),
     )
     .setVersion('0.1.0')
