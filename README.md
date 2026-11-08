@@ -16,7 +16,7 @@ API privada de pagos: registra órdenes de la plataforma AgroCloud (Laravel/Post
 
 ## Versiones
 
-`package.json` conserva exactamente los **rangos de versión declarados** en `ilanangelesrodriguez/paycore-api` rama `main`, consultados el 7 de noviembre de 2026 (incluye NestJS `^12.0.1`, Mongoose `^9.11.4`, TypeScript `^6.0.2`, Vitest `^4.1.2`, Node `22.x`). Se respetan también las dependencias de desarrollo. **No se incluye `package-lock.json`**, porque la instalación de npm no estuvo disponible durante la generación del ZIP. Ejecuta `npm install` para crear el lockfile, revísalo y súbelo al repositorio antes de desplegar; después usa `npm ci`.
+`package.json` conserva exactamente los **rangos de versión declarados** en `ilanangelesrodriguez/paycore-api` rama `main`, consultados el 7 de noviembre de 2026 (incluye NestJS `^12.0.1`, Mongoose `^9.11.4`, TypeScript `^6.0.2`, Vitest `^4.1.2`, Node `22.x`). Se respetan también las dependencias de desarrollo. Se incluye `package-lock.json`; usa `npm ci` para instalar las versiones resueltas.
 
 ## Arquitectura
 
@@ -167,7 +167,7 @@ Se envía `X-AgroCloud-Signature: sha256=<HMAC-SHA256 del body exacto>`. Laravel
 - Cobros con tarjeta/token como MVP. Yape, PagoEfectivo, generación de órdenes Culqi, 3DS y suscripciones recurrentes nativas aún no están integradas completamente.
 - El módulo de reembolsos registra la solicitud; requiere flujo verificado de confirmación/conciliación antes de usar en vivo.
 - No hay suscripción automática real ni cargos programados: las renovaciones se generan desde Laravel mediante orden `RENEWAL`.
-- Sin lockfile ni build ejecutado durante la creación por falta de acceso al registro npm. Comprueba `npm run build`, `npm test` y tests de integración sandbox después de instalar.
+- Los cambios de arquitectura y documentación requieren validación en integración antes de operar con dinero real.
 
 ## Referencias
 
@@ -175,3 +175,24 @@ Se envía `X-AgroCloud-Signature: sha256=<HMAC-SHA256 del body exacto>`. Laravel
 - [Culqi Custom Checkout](https://docs.culqi.com/es/documentacion/checkout/checkout-custom)
 - [Culqi Webhooks](https://docs.culqi.com/es/documentacion/pagos-online/webhooks/)
 - [AgroCloud](https://github.com/ilanangelesrodriguez/agrocloud)
+
+## Documentación y operación en producción
+
+Swagger UI está disponible en `/docs` y el contrato OpenAPI JSON en `/docs-json`, también con `NODE_ENV=production`. Ambos requieren HTTP Basic en producción:
+
+```dotenv
+NODE_ENV=production
+SWAGGER_ENABLED=true
+SWAGGER_USERNAME=docs
+SWAGGER_PASSWORD=<secreto-independiente-de-al-menos-32-caracteres>
+```
+
+Sirve la API mediante HTTPS. No uses la clave de facturación como contraseña de documentación. El arranque valida la presencia de la contraseña en producción; `SWAGGER_ENABLED=false` deshabilita tanto UI como JSON. La UI no persiste credenciales de API y deshabilita la ejecución de solicitudes en producción. La autenticación de documentación no sustituye `x-service-key` para invocar la API.
+
+La configuración HTTP y la documentación viven en `src/config/application.ts` y `src/config/swagger.ts`. Los contratos compartidos están en `src/common/docs/api-contract.ts`; los módulos conservan sus casos de uso y acceso a persistencia.
+
+Los cobros guardan el evento de notificación sin esperar la respuesta HTTP de Laravel. En procesos persistentes el temporizador despacha eventos; en Vercel se debe programar externamente `POST /api/v1/internal/outbox/dispatch` con `x-service-key`. Cada llamada procesa hasta 20 eventos con cuatro entregas simultáneas y bloqueo de 60 segundos por evento entre instancias. Un proceso interrumpido libera la entrega al vencer el bloqueo. La entrega es al menos una vez; Laravel debe deduplicar por `event_id`. `attempted` cuenta candidatos del lote, que otra instancia podría haber reclamado.
+
+El cambio de la orden a `PAID` y la inserción del evento son escrituras independientes. Si la segunda falla, vuelve a invocar conciliación del pago para regenerar idempotentemente el evento. Si un proceso termina dejando una orden `PROCESSING` sin identificador de cargo, revisa Culqi Panel antes de permitir cualquier nuevo cobro.
+
+Para monitoreo usa `GET /api/v1/health` como liveness y `GET /api/v1/health/ready` como readiness de MongoDB. Readiness no comprueba pagos ni disponibilidad de Culqi. Los índices nuevos de outbox e intentos deben existir en MongoDB antes de recibir tráfico; si deshabilitas la creación automática de índices, aprovisiónalos durante el despliegue.
